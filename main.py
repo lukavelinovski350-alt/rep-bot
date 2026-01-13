@@ -5,7 +5,6 @@ import asyncio
 from datetime import datetime, timedelta
 from collections import defaultdict
 import os
-import cursor
 from typing import Optional, Dict, List
 from dotenv import load_dotenv
 import logging
@@ -296,24 +295,8 @@ class DatabaseManager:
 
 """
 SCAMMER SYSTEM - PART 1: Database Functions
-Add this to your DatabaseManager class (after the helpvouch functions)
+Add this to your DatabaseManager class (after the helpvouch function
 """
-
-# ========================================
-# ADD TO DatabaseManager.__init__() method in init_database()
-# ========================================
-
-# Add this to the init_database() method, after the helpvouches table:
-
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS scammer_reports (
-        id SERIAL PRIMARY KEY,
-        user_id BIGINT NOT NULL,
-        reporter_id BIGINT NOT NULL,
-        reason TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-''')
 
 # ========================================
 # SCAMMER FUNCTIONS - Add these to DatabaseManager class
