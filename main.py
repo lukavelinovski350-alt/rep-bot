@@ -99,7 +99,7 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
-            
+
             # Cooldowns table
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS cooldowns (
@@ -127,6 +127,17 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+
+            # scam table
+            cursor.execute('''
+               CREATE TABLE IF NOT EXISTS scammer_reports (
+                   id SERIAL PRIMARY KEY,
+                   user_id BIGINT NOT NULL,
+                   reporter_id BIGINT NOT NULL,
+                   reason TEXT NOT NULL,
+                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              )
+          ''')
             
             cursor.close()
             logging.info("✅ Database tables created")
