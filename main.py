@@ -1754,6 +1754,8 @@ async def help_cmd(ctx):
         name="🌟 Reputation Commands",
         value=(
             f"`{Config.PREFIX}vouch @user reason` - Give {Config.VOUCH_REP_AMOUNT} rep\n"
+            f"`{Config.PREFIX}scam @user` - Check scammer reports\n"
+            f"`{Config.PREFIX}listscammers` - View all reported scammers\n"
             f"`{Config.PREFIX}helpvouch @user` - Staff - Give 2 rep per use| Members - Give 1 rep per use\n"
             f"`{Config.PREFIX}dummy @user` - Remove 3 rep (3x/day)\n"
             f"`{Config.PREFIX}leaderboard` - View leaderboard\n"
@@ -1763,7 +1765,17 @@ async def help_cmd(ctx):
         ),
         inline=False
     )
-    
+
+"""
+# For public commands section:
+
+
+# For staff commands section (if is_staff_user):
+f"`{Config.PREFIX}applyscammer @user reason` - Report a scammer\n"
+f"`{Config.PREFIX}removescammer @user [report_id]` - Remove report\n"
+f"`{Config.PREFIX}clearallscam @user` - Clear all reports\n"
+"""
+
     if is_owner_user:
         embed.add_field(
             name="👑 Owner Commands",
@@ -1774,7 +1786,10 @@ async def help_cmd(ctx):
                 f"`{Config.PREFIX}removerep @user amount` - Remove rep\n"
                 f"`{Config.PREFIX}setrep @user amount` - Set rep\n"
                 f"`{Config.PREFIX}clearrep @user` - Clear all data\n"
-                f"`{Config.PREFIX}repstats` - View statistics"
+                f"`{Config.PREFIX}repstats` - View statistics\n"
+                f"`{Config.PREFIX}applyscammer @user reason` - Report a scammer\n"
+                f"`{Config.PREFIX}removescammer @user [report_id]` - Remove report\n"
+                f"`{Config.PREFIX}clearallscam @user` - Clear all reports"
             ),
             inline=False
         )
