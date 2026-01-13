@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 
 class Config:
-    OWNER_ID = 1029438856069656576
+    OWNER_ID = 1439497398190866495
     TOKEN = os.getenv('DISCORD_BOT_TOKEN')
     DATABASE_URL = os.getenv('DATABASE_URL')  # ⭐ PostgreSQL URL from Render
     PREFIX = '!'
