@@ -303,12 +303,6 @@ class DatabaseManager:
         except Exception as e:
             logging.error(f"Error getting history: {e}")
             return []
-
-"""
-SCAMMER SYSTEM - PART 1: Database Functions
-Add thisbaseManager class (after the helpvouch function
-"""
-
     
     # ========================================
     # DUMMY FUNCTIONS
@@ -361,7 +355,7 @@ Add thisbaseManager class (after the helpvouch function
         except Exception as e:
             logging.error(f"Error using dummy: {e}")
 
-# ========================================
+    # ========================================
     # HELPVOUCH FUNCTIONS
     # ========================================
     
@@ -472,7 +466,7 @@ Add thisbaseManager class (after the helpvouch function
             logging.error(f"Error checking scammer status: {e}")
             return False
 
-# ========================================
+    # ========================================
     # BLACKLIST FUNCTIONS
     # ========================================
     
