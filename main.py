@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 
 class Config:
-    OWNER_ID = 1439497398190866495
+    OWNER_ID = 1029438856069656576
     TOKEN = os.getenv('DISCORD_BOT_TOKEN')
     DATABASE_URL = os.getenv('DATABASE_URL')  # ⭐ PostgreSQL URL from Render
     PREFIX = '!'
@@ -292,6 +292,123 @@ class DatabaseManager:
         except Exception as e:
             logging.error(f"Error getting history: {e}")
             return []
+
+"""
+SCAMMER SYSTEM - PART 1: Database Functions
+Add this to your DatabaseManager class (after the helpvouch functions)
+"""
+
+# ========================================
+# ADD TO DatabaseManager.__init__() method in init_database()
+# ========================================
+
+# Add this to the init_database() method, after the helpvouches table:
+
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS scammer_reports (
+        id SERIAL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        reporter_id BIGINT NOT NULL,
+        reason TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+''')
+
+# ========================================
+# SCAMMER FUNCTIONS - Add these to DatabaseManager class
+# ========================================
+
+def add_scammer_report(self, user_id: int, reporter_id: int, reason: str):
+    """Add a scammer report (Staff only)"""
+    try:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT INTO scammer_reports (user_id, reporter_id, reason)
+            VALUES (%s, %s, %s)
+        ''', (user_id, reporter_id, reason))
+        cursor.close()
+        logging.info(f"Scammer report added: {reporter_id} -> {user_id}")
+    except Exception as e:
+        logging.error(f"Error adding scammer report: {e}")
+
+def get_scammer_reports(self, user_id: int) -> List[Dict]:
+    """Get all scammer reports for a user"""
+    try:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT id, reporter_id, reason, created_at
+            FROM scammer_reports
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+        ''', (user_id,))
+        results = cursor.fetchall()
+        cursor.close()
+        
+        return [{
+            'id': row[0],
+            'reporter': row[1],
+            'reason': row[2],
+            'timestamp': row[3].isoformat()
+        } for row in results]
+    except Exception as e:
+        logging.error(f"Error getting scammer reports: {e}")
+        return []
+
+def remove_scammer_report(self, report_id: int):
+    """Remove a specific scammer report by ID"""
+    try:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            DELETE FROM scammer_reports WHERE id = %s
+        ''', (report_id,))
+        cursor.close()
+        logging.info(f"Scammer report {report_id} removed")
+    except Exception as e:
+        logging.error(f"Error removing scammer report: {e}")
+
+def clear_all_scammer_reports(self, user_id: int):
+    """Clear all scammer reports for a user"""
+    try:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            DELETE FROM scammer_reports WHERE user_id = %s
+        ''', (user_id,))
+        cursor.close()
+        logging.info(f"All scammer reports cleared for user {user_id}")
+    except Exception as e:
+        logging.error(f"Error clearing scammer reports: {e}")
+
+def get_all_scammers(self) -> List[tuple]:
+    """Get all users who have scammer reports"""
+    try:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT user_id, COUNT(*) as report_count
+            FROM scammer_reports
+            GROUP BY user_id
+            ORDER BY report_count DESC
+        ''')
+        results = cursor.fetchall()
+        cursor.close()
+        return results
+    except Exception as e:
+        logging.error(f"Error getting all scammers: {e}")
+        return []
+
+def is_reported_scammer(self, user_id: int) -> bool:
+    """Check if user has any scammer reports"""
+    try:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT COUNT(*) FROM scammer_reports WHERE user_id = %s
+        ''', (user_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        return result[0] > 0 if result else False
+    except Exception as e:
+        logging.error(f"Error checking scammer status: {e}")
+        return False
+
     
     # ========================================
     # BLACKLIST FUNCTIONS
@@ -1047,6 +1164,393 @@ async def viewblacklist_cmd(ctx):
     
     if len(blacklist) > 25:
         embed.set_footer(text=f"Showing 25 of {len(blacklist)} users")
+    
+    await ctx.send(embed=embed)
+
+"""
+SCAMMER SYSTEM - PART 2: Commands
+Add these commands to your bot (after the blacklist commands)
+"""
+
+# ========================================
+# APPLY SCAMMER COMMAND (STAFF ONLY)
+# ========================================
+
+def is_staff():
+    """Check if user has staff role"""
+    async def predicate(ctx):
+        if not has_staff_role(ctx.author):
+            embed = discord.Embed(
+                title="🚫 Staff Only",
+                description="Only staff members can use this command.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+            return False
+        return True
+    return commands.check(predicate)
+
+@bot.command(name='applyscammer', aliases=['reportscammer', 'addscammer'])
+@is_staff()
+async def applyscammer_cmd(ctx, member: discord.Member, *, reason: str = None):
+    """Report a user as a scammer (STAFF ONLY)"""
+    
+    if not reason or len(reason.strip()) < 5:
+        embed = discord.Embed(
+            title="⚠️ Reason Required",
+            description="You must provide a detailed reason when reporting a scammer.",
+            color=discord.Color.red()
+        )
+        embed.add_field(
+            name="Usage",
+            value=f"`{Config.PREFIX}applyscammer @user detailed reason here`",
+            inline=False
+        )
+        embed.add_field(
+            name="Example",
+            value=f"`{Config.PREFIX}applyscammer @John He scammed me for $50 via fake PayPal`",
+            inline=False
+        )
+        await ctx.send(embed=embed)
+        return
+    
+    if member.id == ctx.author.id:
+        embed = discord.Embed(
+            title="❌ Cannot Report Yourself",
+            description="You cannot report yourself as a scammer!",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+        return
+    
+    if member.bot:
+        embed = discord.Embed(
+            title="❌ Cannot Report Bots",
+            description="You cannot report bots as scammers!",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+        return
+    
+    # Add scammer report to database
+    db.add_scammer_report(member.id, ctx.author.id, reason)
+    
+    # Get total reports for this user
+    reports = db.get_scammer_reports(member.id)
+    total_reports = len(reports)
+    
+    embed = discord.Embed(
+        title="🚨 Scammer Report Added",
+        description=f"{member.mention} has been reported as a scammer",
+        color=discord.Color.red()
+    )
+    
+    embed.add_field(name="Reported By", value=ctx.author.mention, inline=True)
+    embed.add_field(name="Total Reports", value=f"{total_reports} 🚩", inline=True)
+    embed.add_field(name="Reason", value=reason, inline=False)
+    
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=f"Report ID: {reports[0]['id']} | Reported by {ctx.author.name}")
+    
+    await ctx.send(embed=embed)
+    
+    logging.info(f"Staff {ctx.author.name} reported {member.name} as scammer")
+
+# ========================================
+# SCAM COMMAND (ANYONE CAN USE)
+# ========================================
+
+@bot.command(name='scam', aliases=['scammer', 'checkscammer'])
+async def scam_cmd(ctx, member: discord.Member):
+    """Check if a user has been reported as a scammer (Anyone can use)"""
+    
+    reports = db.get_scammer_reports(member.id)
+    
+    if not reports:
+        embed = discord.Embed(
+            title="✅ No Scammer Reports",
+            description=f"{member.mention} has **no scammer reports**.",
+            color=discord.Color.green()
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_footer(text=f"Checked by {ctx.author.name}")
+        await ctx.send(embed=embed)
+        return
+    
+    # User has scammer reports - show them all
+    embed = discord.Embed(
+        title="🚨 SCAMMER ALERT 🚨",
+        description=f"{member.mention} has been reported as a scammer!",
+        color=discord.Color.dark_red()
+    )
+    
+    embed.set_thumbnail(url=member.display_avatar.url)
+    
+    # Add each report
+    for idx, report in enumerate(reports, 1):
+        reporter = bot.get_user(report['reporter'])
+        reporter_name = reporter.name if reporter else "Unknown Staff"
+        
+        # Parse timestamp
+        timestamp = datetime.fromisoformat(report['timestamp'])
+        time_str = timestamp.strftime('%Y-%m-%d %H:%M UTC')
+        
+        embed.add_field(
+            name=f"🚩 Report #{idx} - By {reporter_name}",
+            value=f"**Reason:** {report['reason']}\n**Date:** {time_str}\n**Report ID:** `{report['id']}`",
+            inline=False
+        )
+    
+    embed.add_field(
+        name="⚠️ WARNING",
+        value=f"This user has **{len(reports)} scammer report(s)**. Exercise extreme caution!",
+        inline=False
+    )
+    
+    embed.set_footer(text=f"Checked by {ctx.author.name} | Total Reports: {len(reports)}")
+    
+    await ctx.send(embed=embed)
+
+# ========================================
+# REMOVE SCAMMER REPORT (STAFF ONLY)
+# ========================================
+
+@bot.command(name='removescammer', aliases=['deletescammer', 'clearscam'])
+@is_staff()
+async def removescammer_cmd(ctx, member: discord.Member, report_id: int = None):
+    """Remove a scammer report (STAFF ONLY)"""
+    
+    reports = db.get_scammer_reports(member.id)
+    
+    if not reports:
+        embed = discord.Embed(
+            title="❌ No Reports Found",
+            description=f"{member.mention} has no scammer reports.",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+        return
+    
+    # If no report_id provided, show all reports and ask which one to delete
+    if report_id is None:
+        embed = discord.Embed(
+            title=f"📋 Scammer Reports for {member.display_name}",
+            description="Use the Report ID to remove a specific report",
+            color=discord.Color.blue()
+        )
+        
+        for idx, report in enumerate(reports, 1):
+            reporter = bot.get_user(report['reporter'])
+            reporter_name = reporter.name if reporter else "Unknown"
+            
+            embed.add_field(
+                name=f"Report #{idx} - ID: {report['id']}",
+                value=f"**By:** {reporter_name}\n**Reason:** {report['reason'][:100]}...",
+                inline=False
+            )
+        
+        embed.add_field(
+            name="💡 How to Remove",
+            value=f"`{Config.PREFIX}removescammer @{member.name} <Report_ID>`\n\n"
+                  f"**Example:** `{Config.PREFIX}removescammer @{member.name} {reports[0]['id']}`\n\n"
+                  f"Or use `{Config.PREFIX}clearallscam @{member.name}` to remove ALL reports",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        return
+    
+    # Check if report_id exists for this user
+    report_exists = any(r['id'] == report_id for r in reports)
+    
+    if not report_exists:
+        embed = discord.Embed(
+            title="❌ Invalid Report ID",
+            description=f"Report ID `{report_id}` not found for {member.mention}",
+            color=discord.Color.red()
+        )
+        embed.add_field(
+            name="Available Report IDs",
+            value=", ".join([f"`{r['id']}`" for r in reports]),
+            inline=False
+        )
+        await ctx.send(embed=embed)
+        return
+    
+    # Remove the report
+    db.remove_scammer_report(report_id)
+    
+    remaining_reports = len(reports) - 1
+    
+    embed = discord.Embed(
+        title="✅ Scammer Report Removed",
+        description=f"Report ID `{report_id}` has been removed for {member.mention}",
+        color=discord.Color.green()
+    )
+    
+    embed.add_field(name="Remaining Reports", value=f"{remaining_reports} 🚩", inline=True)
+    embed.add_field(name="Removed By", value=ctx.author.mention, inline=True)
+    
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=f"Removed by {ctx.author.name}")
+    
+    await ctx.send(embed=embed)
+    
+    logging.info(f"Staff {ctx.author.name} removed scammer report {report_id} for {member.name}")
+
+@bot.command(name='clearallscam', aliases=['clearscammer'])
+@is_staff()
+async def clearallscam_cmd(ctx, member: discord.Member):
+    """Clear ALL scammer reports for a user (STAFF ONLY)"""
+    
+    reports = db.get_scammer_reports(member.id)
+    
+    if not reports:
+        embed = discord.Embed(
+            title="❌ No Reports Found",
+            description=f"{member.mention} has no scammer reports to clear.",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+        return
+    
+    report_count = len(reports)
+    
+    # Confirmation
+    confirm_embed = discord.Embed(
+        title="⚠️ Confirm Clear All Reports",
+        description=f"Are you sure you want to remove ALL scammer reports for {member.mention}?",
+        color=discord.Color.orange()
+    )
+    confirm_embed.add_field(name="Reports to Clear", value=f"{report_count} 🚩", inline=True)
+    confirm_embed.add_field(
+        name="Confirmation",
+        value="React with ✅ to confirm or ❌ to cancel",
+        inline=False
+    )
+    
+    msg = await ctx.send(embed=confirm_embed)
+    await msg.add_reaction("✅")
+    await msg.add_reaction("❌")
+    
+    def check(reaction, user):
+        return user == ctx.author and str(reaction.emoji) in ["✅", "❌"] and reaction.message.id == msg.id
+    
+    try:
+        reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
+        
+        if str(reaction.emoji) == "✅":
+            db.clear_all_scammer_reports(member.id)
+            
+            success_embed = discord.Embed(
+                title="✅ All Reports Cleared",
+                description=f"All {report_count} scammer reports cleared for {member.mention}",
+                color=discord.Color.green()
+            )
+            success_embed.set_thumbnail(url=member.display_avatar.url)
+            success_embed.set_footer(text=f"Cleared by {ctx.author.name}")
+            
+            await msg.edit(embed=success_embed)
+            await msg.clear_reactions()
+            
+            logging.info(f"Staff {ctx.author.name} cleared all scammer reports for {member.name}")
+        else:
+            cancel_embed = discord.Embed(
+                title="❌ Action Cancelled",
+                description="Clear all reports cancelled",
+                color=discord.Color.blue()
+            )
+            await msg.edit(embed=cancel_embed)
+            await msg.clear_reactions()
+    
+    except asyncio.TimeoutError:
+        timeout_embed = discord.Embed(
+            title="⏰ Confirmation Timeout",
+            description="Action cancelled due to timeout",
+            color=discord.Color.orange()
+        )
+        await msg.edit(embed=timeout_embed)
+        await msg.clear_reactions()
+
+"""
+SCAMMER SYSTEM - PART 3: List All Scammers
+Add this command after Part 2 commands
+"""
+
+# ========================================
+# LIST ALL SCAMMERS COMMAND
+# ========================================
+
+@bot.command(name='listscammers', aliases=['scammers', 'scamlist'])
+async def listscammers_cmd(ctx):
+    """View all users reported as scammers (Anyone can use)"""
+    
+    scammers = db.get_all_scammers()
+    
+    if not scammers:
+        embed = discord.Embed(
+            title="✅ No Scammer Reports",
+            description="No users have been reported as scammers yet.",
+            color=discord.Color.green()
+        )
+        embed.set_footer(text=f"Requested by {ctx.author.name}")
+        await ctx.send(embed=embed)
+        return
+    
+    # Create embed with all scammers
+    embed = discord.Embed(
+        title="🚨 Reported Scammers List",
+        description=f"Total users with scammer reports: **{len(scammers)}**",
+        color=discord.Color.dark_red()
+    )
+    
+    scammer_text = []
+    for idx, (user_id, report_count) in enumerate(scammers[:25], 1):  # Limit to 25 to avoid embed limits
+        user = bot.get_user(user_id)
+        
+        if user:
+            user_name = f"{user.name}"
+            user_mention = user.mention
+        else:
+            user_name = f"Unknown User"
+            user_mention = f"ID: {user_id}"
+        
+        # Add warning emoji based on report count
+        if report_count >= 5:
+            warning = "🔴"  # High risk
+        elif report_count >= 3:
+            warning = "🟠"  # Medium risk
+        else:
+            warning = "🟡"  # Low risk
+        
+        scammer_text.append(f"{warning} **{idx}.** {user_mention} - **{report_count}** report(s)")
+    
+    embed.add_field(
+        name="📋 Scammer List",
+        value="\n".join(scammer_text),
+        inline=False
+    )
+    
+    if len(scammers) > 25:
+        embed.add_field(
+            name="ℹ️ Note",
+            value=f"Showing top 25 of {len(scammers)} reported users",
+            inline=False
+        )
+    
+    embed.add_field(
+        name="🔍 Check Individual Reports",
+        value=f"Use `{Config.PREFIX}scam @user` to see detailed reports for a specific user",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🚩 Warning Levels",
+        value="🔴 High Risk (5+ reports)\n🟠 Medium Risk (3-4 reports)\n🟡 Low Risk (1-2 reports)",
+        inline=False
+    )
+    
+    embed.set_footer(text=f"Requested by {ctx.author.name}")
     
     await ctx.send(embed=embed)
 
