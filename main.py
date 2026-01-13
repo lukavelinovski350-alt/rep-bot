@@ -311,63 +311,6 @@ Add thisbaseManager class (after the helpvouch function
 
     
     # ========================================
-    # BLACKLIST FUNCTIONS
-    # ========================================
-    
-    def is_blacklisted(self, user_id: int) -> bool:
-        """Check if blacklisted"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT is_blacklisted FROM users WHERE user_id = %s
-            ''', (user_id,))
-            result = cursor.fetchone()
-            cursor.close()
-            return result[0] if result else False
-        except Exception as e:
-            logging.error(f"Error checking blacklist: {e}")
-            return False
-    
-    def add_to_blacklist(self, user_id: int):
-        """Add to blacklist"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                INSERT INTO users (user_id, is_blacklisted)
-                VALUES (%s, TRUE)
-                ON CONFLICT (user_id)
-                DO UPDATE SET is_blacklisted = TRUE
-            ''', (user_id,))
-            cursor.close()
-        except Exception as e:
-            logging.error(f"Error adding to blacklist: {e}")
-    
-    def remove_from_blacklist(self, user_id: int):
-        """Remove from blacklist"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                UPDATE users SET is_blacklisted = FALSE WHERE user_id = %s
-            ''', (user_id,))
-            cursor.close()
-        except Exception as e:
-            logging.error(f"Error removing from blacklist: {e}")
-    
-    def get_blacklist(self) -> List[int]:
-        """Get all blacklisted users"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT user_id FROM users WHERE is_blacklisted = TRUE
-            ''')
-            results = cursor.fetchall()
-            cursor.close()
-            return [row[0] for row in results]
-        except Exception as e:
-            logging.error(f"Error getting blacklist: {e}")
-            return []
-    
-    # ========================================
     # DUMMY FUNCTIONS
     # ========================================
     
@@ -528,6 +471,63 @@ Add thisbaseManager class (after the helpvouch function
         except Exception as e:
             logging.error(f"Error checking scammer status: {e}")
             return False
+
+# ========================================
+    # BLACKLIST FUNCTIONS
+    # ========================================
+    
+    def is_blacklisted(self, user_id: int) -> bool:
+        """Check if blacklisted"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT is_blacklisted FROM users WHERE user_id = %s
+            ''', (user_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            return result[0] if result else False
+        except Exception as e:
+            logging.error(f"Error checking blacklist: {e}")
+            return False
+    
+    def add_to_blacklist(self, user_id: int):
+        """Add to blacklist"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT INTO users (user_id, is_blacklisted)
+                VALUES (%s, TRUE)
+                ON CONFLICT (user_id)
+                DO UPDATE SET is_blacklisted = TRUE
+            ''', (user_id,))
+            cursor.close()
+        except Exception as e:
+            logging.error(f"Error adding to blacklist: {e}")
+    
+    def remove_from_blacklist(self, user_id: int):
+        """Remove from blacklist"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                UPDATE users SET is_blacklisted = FALSE WHERE user_id = %s
+            ''', (user_id,))
+            cursor.close()
+        except Exception as e:
+            logging.error(f"Error removing from blacklist: {e}")
+    
+    def get_blacklist(self) -> List[int]:
+        """Get all blacklisted users"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT user_id FROM users WHERE is_blacklisted = TRUE
+            ''')
+            results = cursor.fetchall()
+            cursor.close()
+            return [row[0] for row in results]
+        except Exception as e:
+            logging.error(f"Error getting blacklist: {e}")
+            return []
 
 # Initialize database
 db = DatabaseManager()
