@@ -30,7 +30,7 @@ class Config:
     PORT = int(os.getenv('PORT', 8080))
     
     # Reputation Settings
-    VOUCH_REP_AMOUNT = 3
+    VOUCH_REP_AMOUNT = 1
     VOUCH_COOLDOWN = 600
     LEADERBOARD_PER_PAGE = 10
     
@@ -961,6 +961,19 @@ async def vouch_history_cmd(ctx, member: discord.Member = None):
 @bot.command(name='dummy')
 async def dummy_cmd(ctx, member: discord.Member):
     """Remove 3 rep from a user (3 times per day limit)"""
+
+ # ADD THIS NEW CHECK HERE 
+    
+    if db.is_blacklisted(ctx.author.id):
+        embed = discord.Embed(
+            title="🚫 You Are Blacklisted",
+            description="You have been blacklisted and cannot use the dummy command.",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed)
+        return
+        
+    # END OF NEW CHECK 
     
     can_use, remaining = db.can_use_dummy(ctx.author.id)
     
@@ -1182,8 +1195,37 @@ def is_staff():
 
 @bot.command(name='applyscammer', aliases=['reportscammer', 'addscammer'])
 @is_staff()
-async def applyscammer_cmd(ctx, member: discord.Member, *, reason: str = None):
-    """Report a user as a scammer (STAFF ONLY)"""
+async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
+    """Report a user as a scammer (STAFF ONLY) - Works with @mention, username, or user ID"""
+    
+    # Try to convert to member/user
+    member = None
+    user_id = None
+    
+    # Try as mention or ID first
+    try:
+        # Remove < @ ! > characters if it's a mention
+        clean_id = user_input.strip('<@!>')
+        user_id = int(clean_id)
+        member = ctx.guild.get_member(user_id)
+        if not member:
+            # Try to fetch user from Discord
+            try:
+                member = await bot.fetch_user(user_id)
+            except:
+                pass
+    except ValueError:
+        # Not an ID, try as member
+        try:
+            member = await commands.MemberConverter().convert(ctx, user_input)
+            user_id = member.id
+        except:
+            await ctx.send(f"❌ Could not find user: {user_input}")
+            return
+    
+    if not user_id:
+        await ctx.send("❌ Invalid user.")
+        return
     
     if not reason or len(reason.strip()) < 5:
         embed = discord.Embed(
@@ -1230,17 +1272,22 @@ async def applyscammer_cmd(ctx, member: discord.Member, *, reason: str = None):
     total_reports = len(reports)
     
     embed = discord.Embed(
-        title="🚨 Scammer Report Added",
-        description=f"{member.mention} has been reported as a scammer",
-        color=discord.Color.red()
-    )
-    
-    embed.add_field(name="Reported By", value=ctx.author.mention, inline=True)
-    embed.add_field(name="Total Reports", value=f"{total_reports} 🚩", inline=True)
-    embed.add_field(name="Reason", value=reason, inline=False)
-    
+    title="🚨 Scammer Report Added",
+    description=f"<@{user_id}> has been reported as a scammer",
+    color=discord.Color.red()
+)
+
+embed.add_field(name="Reported By", value=ctx.author.mention, inline=True)
+embed.add_field(name="Total Reports", value=f"{total_reports} 🚩", inline=True)
+embed.add_field(name="Reason", value=reason, inline=False)
+
+# Only set thumbnail if we have the member object
+if member and hasattr(member, 'display_avatar'):
     embed.set_thumbnail(url=member.display_avatar.url)
-    embed.set_footer(text=f"Report ID: {reports[0]['id']} | Reported by {ctx.author.name}")
+elif member and hasattr(member, 'avatar'):
+    embed.set_thumbnail(url=member.avatar.url)
+    
+embed.set_footer(text=f"Report ID: {reports[0]['id']} | Reported by {ctx.author.name}")
     
     await ctx.send(embed=embed)
     
@@ -1751,7 +1798,7 @@ async def help_cmd(ctx):
             f"`{Config.PREFIX}vouch @user reason` - Give {Config.VOUCH_REP_AMOUNT} rep\n"
             f"`{Config.PREFIX}scam @user` - Check scammer reports\n"
             f"`{Config.PREFIX}listscammers` - View all reported scammers\n"
-            f"`{Config.PREFIX}helpvouch @user` - Staff - Give 2 rep per use| Members - Give 1 rep per use\n"
+            f"`{Config.PREFIX}helpvouch @user` - Staff - Give 2 rep per use | Members - Give 1 rep per use\n"
             f"`{Config.PREFIX}dummy @user` - Remove 3 rep (3x/day)\n"
             f"`{Config.PREFIX}leaderboard` - View leaderboard\n"
             f"`{Config.PREFIX}rank [@user]` - Check reputation\n"
