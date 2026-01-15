@@ -1287,9 +1287,8 @@ if member and hasattr(member, 'display_avatar'):
 elif member and hasattr(member, 'avatar'):
     embed.set_thumbnail(url=member.avatar.url)
     
-embed.set_footer(text=f"Report ID: {reports[0]['id']} | Reported by {ctx.author.name}") 
-
-await ctx.send(embed=embed)
+        embed.set_footer(text=f"Report ID: {reports[0]['id']} | Reported by {ctx.author.name}") 
+        await ctx.send(embed=embed)
 
 # ========================================
 # SCAM COMMAND (ANYONE CAN USE)
