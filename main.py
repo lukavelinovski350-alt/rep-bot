@@ -1289,7 +1289,6 @@ elif member and hasattr(member, 'avatar'):
     
 embed.set_footer(text=f"Report ID: {reports[0]['id']} | Reported by {ctx.author.name}") 
 await ctx.send(embed=embed)
-logging.info(f"Staff {ctx.author.name} reported {member.name} as scammer")
 
 # ========================================
 # SCAM COMMAND (ANYONE CAN USE)
