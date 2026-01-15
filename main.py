@@ -1288,6 +1288,7 @@ elif member and hasattr(member, 'avatar'):
     embed.set_thumbnail(url=member.avatar.url)
     
 embed.set_footer(text=f"Report ID: {reports[0]['id']} | Reported by {ctx.author.name}") 
+
 await ctx.send(embed=embed)
 
 # ========================================
@@ -1341,9 +1342,9 @@ async def scam_cmd(ctx, member: discord.Member):
         inline=False
     )
     
-    embed.set_footer(text=f"Checked by {ctx.author.name} | Total Reports: {len(reports)}")
+        embed.set_footer(text=f"Checked by {ctx.author.name} | Total Reports: {len(reports)}")
     
-    await ctx.send(embed=embed)
+        await ctx.send(embed=embed)
 
 # ========================================
 # REMOVE SCAMMER REPORT (STAFF ONLY)
