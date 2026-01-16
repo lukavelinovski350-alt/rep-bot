@@ -47,7 +47,7 @@ class Config:
     HELPVOUCH_REP_MEMBER = 1
     HELPVOUCH_REP_STAFF = 2
     DUMMY_PER_DAY = 3
-    DUMMY_REP_REMOVE = 3
+    DUMMY_REP_REMOVE = 1
 
 class DatabaseManager:
     """PostgreSQL Database - DATA PERSISTS FOREVER"""
@@ -1800,7 +1800,7 @@ async def help_cmd(ctx):
             f"`{Config.PREFIX}scam @user` - Check scammer reports\n"
             f"`{Config.PREFIX}listscammers` - View all reported scammers\n"
             f"`{Config.PREFIX}helpvouch @user` - Staff - Give 2 rep per use | Members - Give 1 rep per use\n"
-            f"`{Config.PREFIX}dummy @user` - Remove 3 rep (3x/day)\n"
+            f"`{Config.PREFIX}dummy @user` - Remove 1 rep (3x/day)\n"
             f"`{Config.PREFIX}leaderboard` - View leaderboard\n"
             f"`{Config.PREFIX}rank [@user]` - Check reputation\n"
             f"`{Config.PREFIX}vouchhistory [@user]` - View history\n"
@@ -1813,7 +1813,7 @@ async def help_cmd(ctx):
         embed.add_field(
             name="👑 Owner Commands",
             value=(
-                f"`{Config.PREFIX}repblacklist @user` - Toggle blacklist\n"
+                f"`{Config.PREFIX}repblacklist @user` - Toggle blacklist(they cant vouch or nun)\n"
                 f"`{Config.PREFIX}viewblacklist` - View blacklisted\n"
                 f"`{Config.PREFIX}addrep @user amount` - Add rep\n"
                 f"`{Config.PREFIX}removerep @user amount` - Remove rep\n"
