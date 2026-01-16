@@ -1285,7 +1285,7 @@ async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
     embed.add_field(name="Total Reports", value=f"{total_reports} 🚩", inline=True)
     embed.add_field(name="Reason", value=reason, inline=False)
     
-    # Only set thumbnail if we have the member object
+    # Only set thumbnail i we have the member object
     if member and hasattr(member, 'display_avatar'):
         embed.set_thumbnail(url=member.display_avatar.url)
     elif member and hasattr(member, 'avatar'):
@@ -1295,9 +1295,8 @@ async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
     await ctx.send(embed=embed)
 
 
-# ========================================
-# SCAM COMMAND (ANYONE CAN USE)
-# ========================================
+# FIND the scam command (around line 1295-1350)
+# REPLACE the entire command with this CORRECTLY INDENTED version:
 
 @bot.command(name='scam', aliases=['scammer', 'checkscammer'])
 async def scam_cmd(ctx, member: discord.Member):
@@ -1346,9 +1345,9 @@ async def scam_cmd(ctx, member: discord.Member):
         inline=False
     )
     
-        embed.set_footer(text=f"Checked by {ctx.author.name} | Total Reports: {len(reports)}")
+    embed.set_footer(text=f"Checked by {ctx.author.name} | Total Reports: {len(reports)}")
     
-        await ctx.send(embed=embed)
+    await ctx.send(embed=embed)
 
 # ========================================
 # REMOVE SCAMMER REPORT (STAFF ONLY)
