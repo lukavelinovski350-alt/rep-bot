@@ -1832,7 +1832,7 @@ async def help_cmd(ctx):
         value=(
             f"• Vouch: **{Config.VOUCH_REP_AMOUNT} rep** (cooldown: {Config.VOUCH_COOLDOWN // 60} min)\n"
             f"• Helpvouch: Staff Gives **2 rep per use**, Members Gives **1 rep per use**\n"
-            f"• Dummy: Remove **3 rep** ({Config.DUMMY_PER_DAY}x limited uses per day)\n"
+            f"• Dummy: Remove **1 rep** ({Config.DUMMY_PER_DAY}x limited uses per day)\n"
         ),
         inline=False
     )
