@@ -1193,6 +1193,9 @@ def is_staff():
         return True
     return commands.check(predicate)
 
+# FIND the applyscammer command (around line 1240-1290)
+# REPLACE the entire embed section with this CORRECTLY INDENTED version:
+
 @bot.command(name='applyscammer', aliases=['reportscammer', 'addscammer'])
 @is_staff()
 async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
@@ -1246,7 +1249,7 @@ async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
         await ctx.send(embed=embed)
         return
     
-    if member.id == ctx.author.id:
+    if user_id == ctx.author.id:
         embed = discord.Embed(
             title="❌ Cannot Report Yourself",
             description="You cannot report yourself as a scammer!",
@@ -1255,7 +1258,7 @@ async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
         await ctx.send(embed=embed)
         return
     
-    if member.bot:
+    if member and member.bot:
         embed = discord.Embed(
             title="❌ Cannot Report Bots",
             description="You cannot report bots as scammers!",
@@ -1265,30 +1268,32 @@ async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
         return
     
     # Add scammer report to database
-    db.add_scammer_report(member.id, ctx.author.id, reason)
+    db.add_scammer_report(user_id, ctx.author.id, reason)
     
     # Get total reports for this user
-    reports = db.get_scammer_reports(member.id)
+    reports = db.get_scammer_reports(user_id)
     total_reports = len(reports)
     
+    # THIS IS THE FIXED SECTION - PROPER INDENTATION
     embed = discord.Embed(
-    title="🚨 Scammer Report Added",
-    description=f"<@{user_id}> has been reported as a scammer",
-    color=discord.Color.red()
-)
-
-embed.add_field(name="Reported By", value=ctx.author.mention, inline=True)
-embed.add_field(name="Total Reports", value=f"{total_reports} 🚩", inline=True)
-embed.add_field(name="Reason", value=reason, inline=False)
-
-# Only set thumbnail if we have the member object
-if member and hasattr(member, 'display_avatar'):
-    embed.set_thumbnail(url=member.display_avatar.url)
-elif member and hasattr(member, 'avatar'):
-    embed.set_thumbnail(url=member.avatar.url)
+        title="🚨 Scammer Report Added",
+        description=f"<@{user_id}> has been reported as a scammer",
+        color=discord.Color.red()
+    )
     
-        embed.set_footer(text=f"Report ID: {reports[0]['id']} | Reported by {ctx.author.name}") 
-        await ctx.send(embed=embed)
+    embed.add_field(name="Reported By", value=ctx.author.mention, inline=True)
+    embed.add_field(name="Total Reports", value=f"{total_reports} 🚩", inline=True)
+    embed.add_field(name="Reason", value=reason, inline=False)
+    
+    # Only set thumbnail if we have the member object
+    if member and hasattr(member, 'display_avatar'):
+        embed.set_thumbnail(url=member.display_avatar.url)
+    elif member and hasattr(member, 'avatar'):
+        embed.set_thumbnail(url=member.avatar.url)
+    
+    embed.set_footer(text=f"Report ID: {reports[0]['id']} | Reported by {ctx.author.name}")
+    await ctx.send(embed=embed)
+
 
 # ========================================
 # SCAM COMMAND (ANYONE CAN USE)
