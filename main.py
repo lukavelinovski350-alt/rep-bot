@@ -1204,32 +1204,45 @@ async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
     # Try to convert to member/user
     member = None
     user_id = None
+    user_name = user_input  # Default to whatever they typed
     
     # Try as mention or ID first
     try:
         # Remove < @ ! > characters if it's a mention
         clean_id = user_input.strip('<@!>')
         user_id = int(clean_id)
+        
+        # Try to get member from server first
         member = ctx.guild.get_member(user_id)
+        
+        # If not in server, try to fetch from Discord
         if not member:
-            # Try to fetch user from Discord
             try:
                 member = await bot.fetch_user(user_id)
+                user_name = member.name
             except:
-                pass
+                # User ID is valid but user doesn't exist on Discord
+                user_name = f"User ID: {user_id}"
+    
     except ValueError:
-        # Not an ID, try as member
+        # Not an ID, try as username/mention
         try:
+            # Try to find member in server
             member = await commands.MemberConverter().convert(ctx, user_input)
             user_id = member.id
+            user_name = member.name
         except:
-            await ctx.send(f"❌ Could not find user: {user_input}")
-            return
+            # Not in server - treat as external user
+            # Keep the username they provided and generate a fake ID
+            user_name = user_input
+            # Use hash of username as consistent ID (so same name = same ID)
+            user_id = hash(user_input.lower()) % (10**15)  # Generate consistent ID
     
     if not user_id:
-        await ctx.send("❌ Invalid user.")
+        await ctx.send("❌ Invalid user input.")
         return
     
+    # Check if reason is provided
     if not reason or len(reason.strip()) < 5:
         embed = discord.Embed(
             title="⚠️ Reason Required",
@@ -1238,17 +1251,22 @@ async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
         )
         embed.add_field(
             name="Usage",
-            value=f"`{Config.PREFIX}applyscammer @user detailed reason here`",
+            value=f"`{Config.PREFIX}applyscammer @user detailed reason here`\n"
+                  f"`{Config.PREFIX}applyscammer username detailed reason here`\n"
+                  f"`{Config.PREFIX}applyscammer 123456789 detailed reason here`",
             inline=False
         )
         embed.add_field(
-            name="Example",
-            value=f"`{Config.PREFIX}applyscammer @John He scammed me for $50 via fake PayPal`",
+            name="Examples",
+            value=f"`{Config.PREFIX}applyscammer @John He scammed me for $50`\n"
+                  f"`{Config.PREFIX}applyscammer FartBlox123 Scammed multiple people on TikTok`\n"
+                  f"`{Config.PREFIX}applyscammer ScammerYT Known YouTube scammer`",
             inline=False
         )
         await ctx.send(embed=embed)
         return
     
+    # Prevent self-reporting
     if user_id == ctx.author.id:
         embed = discord.Embed(
             title="❌ Cannot Report Yourself",
@@ -1258,6 +1276,7 @@ async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
         await ctx.send(embed=embed)
         return
     
+    # Prevent bot reporting
     if member and member.bot:
         embed = discord.Embed(
             title="❌ Cannot Report Bots",
@@ -1274,18 +1293,22 @@ async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
     reports = db.get_scammer_reports(user_id)
     total_reports = len(reports)
     
-    # THIS IS THE FIXED SECTION - PROPER INDENTATION
+    # Create success embed
     embed = discord.Embed(
         title="🚨 Scammer Report Added",
-        description=f"<@{user_id}> has been reported as a scammer",
+        description=f"**{user_name}** has been reported as a scammer",
         color=discord.Color.red()
     )
     
+    embed.add_field(name="Reported User", value=user_name, inline=True)
     embed.add_field(name="Reported By", value=ctx.author.mention, inline=True)
     embed.add_field(name="Total Reports", value=f"{total_reports} 🚩", inline=True)
     embed.add_field(name="Reason", value=reason, inline=False)
     
-    # Only set thumbnail i we have the member object
+    # Add user ID for reference
+    embed.add_field(name="User ID", value=f"`{user_id}`", inline=False)
+    
+    # Only set thumbnail if we have the member object
     if member and hasattr(member, 'display_avatar'):
         embed.set_thumbnail(url=member.display_avatar.url)
     elif member and hasattr(member, 'avatar'):
@@ -1293,43 +1316,79 @@ async def applyscammer_cmd(ctx, user_input: str, *, reason: str = None):
     
     embed.set_footer(text=f"Report ID: {reports[0]['id']} | Reported by {ctx.author.name}")
     await ctx.send(embed=embed)
+    
+    logging.info(f"Staff {ctx.author.name} reported {user_name} (ID: {user_id}) as scammer")
+
 
 
 # FIND the scam command (around line 1295-1350)
-# REPLACE the entire command with this CORRECTLY INDENTED version:
 
-@bot.command(name='scam', aliases=['scammer', 'checkscammer'])
-async def scam_cmd(ctx, member: discord.Member):
-    """Check if a user has been reported as a scammer (Anyone can use)"""
+@bot.command(name='scamcheck', aliases=['scammer', 'checkscammer'])
+async def scam_cmd(ctx, *, user_input: str):
+    """Check if a user has been reported as a scammer - Works with @mention, username, or ID"""
     
-    reports = db.get_scammer_reports(member.id)
+    # Try to convert to member/user
+    member = None
+    user_id = None
+    user_name = user_input
+    
+    # Try as mention or ID first
+    try:
+        clean_id = user_input.strip('<@!>')
+        user_id = int(clean_id)
+        
+        member = ctx.guild.get_member(user_id)
+        if not member:
+            try:
+                member = await bot.fetch_user(user_id)
+                user_name = member.name
+            except:
+                user_name = f"User ID: {user_id}"
+    
+    except ValueError:
+        # Try as member
+        try:
+            member = await commands.MemberConverter().convert(ctx, user_input)
+            user_id = member.id
+            user_name = member.name
+        except:
+            # External user - use hash
+            user_name = user_input
+            user_id = hash(user_input.lower()) % (10**15)
+    
+    if not user_id:
+        await ctx.send("❌ Invalid user input.")
+        return
+    
+    reports = db.get_scammer_reports(user_id)
     
     if not reports:
         embed = discord.Embed(
             title="✅ No Scammer Reports",
-            description=f"{member.mention} has **no scammer reports**.",
+            description=f"**{user_name}** has **no scammer reports**.",
             color=discord.Color.green()
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
+        if member and hasattr(member, 'display_avatar'):
+            embed.set_thumbnail(url=member.display_avatar.url)
         embed.set_footer(text=f"Checked by {ctx.author.name}")
         await ctx.send(embed=embed)
         return
     
-    # User has scammer reports - show them all
+    # User has scammer reports
     embed = discord.Embed(
         title="🚨 SCAMMER ALERT 🚨",
-        description=f"{member.mention} has been reported as a scammer!",
+        description=f"**{user_name}** has been reported as a scammer!",
         color=discord.Color.dark_red()
     )
     
-    embed.set_thumbnail(url=member.display_avatar.url)
+    if member and hasattr(member, 'display_avatar'):
+        embed.set_thumbnail(url=member.display_avatar.url)
     
     # Add each report
     for idx, report in enumerate(reports, 1):
         reporter = bot.get_user(report['reporter'])
         reporter_name = reporter.name if reporter else "Unknown Staff"
         
-        # Parse timestamp
         timestamp = datetime.fromisoformat(report['timestamp'])
         time_str = timestamp.strftime('%Y-%m-%d %H:%M UTC')
         
@@ -1345,34 +1404,65 @@ async def scam_cmd(ctx, member: discord.Member):
         inline=False
     )
     
+    embed.add_field(name="User ID", value=f"`{user_id}`", inline=False)
     embed.set_footer(text=f"Checked by {ctx.author.name} | Total Reports: {len(reports)}")
     
     await ctx.send(embed=embed)
 
 # ========================================
-# REMOVE SCAMMER REPORT (STAFF ONLY)
+# PART 3: Replace !removescammer command (line ~1350)
 # ========================================
 
 @bot.command(name='removescammer', aliases=['deletescammer', 'clearscam'])
 @is_staff()
-async def removescammer_cmd(ctx, member: discord.Member, report_id: int = None):
-    """Remove a scammer report (STAFF ONLY)"""
+async def removescammer_cmd(ctx, user_input: str, report_id: int = None):
+    """Remove a scammer report - Works with @mention, username, or ID (STAFF ONLY)"""
     
-    reports = db.get_scammer_reports(member.id)
+    # Try to convert to member/user
+    member = None
+    user_id = None
+    user_name = user_input
+    
+    try:
+        clean_id = user_input.strip('<@!>')
+        user_id = int(clean_id)
+        
+        member = ctx.guild.get_member(user_id)
+        if not member:
+            try:
+                member = await bot.fetch_user(user_id)
+                user_name = member.name
+            except:
+                user_name = f"User ID: {user_id}"
+    
+    except ValueError:
+        try:
+            member = await commands.MemberConverter().convert(ctx, user_input)
+            user_id = member.id
+            user_name = member.name
+        except:
+            user_name = user_input
+            user_id = hash(user_input.lower()) % (10**15)
+    
+    if not user_id:
+        await ctx.send("❌ Invalid user input.")
+        return
+    
+    reports = db.get_scammer_reports(user_id)
     
     if not reports:
         embed = discord.Embed(
             title="❌ No Reports Found",
-            description=f"{member.mention} has no scammer reports.",
+            description=f"**{user_name}** has no scammer reports.",
             color=discord.Color.red()
         )
         await ctx.send(embed=embed)
         return
     
-    # If no report_id provided, show all reports and ask which one to delete
+    # If no report_id, show all reports
     if report_id is None:
         embed = discord.Embed(
-            title=f"📋 Scammer Reports for {member.display_name}",
+            title=f"📋 Scammer Reports for {user_name}",
             description="Use the Report ID to remove a specific report",
             color=discord.Color.blue()
         )
@@ -1389,22 +1479,22 @@ async def removescammer_cmd(ctx, member: discord.Member, report_id: int = None):
         
         embed.add_field(
             name="💡 How to Remove",
-            value=f"`{Config.PREFIX}removescammer @{member.name} <Report_ID>`\n\n"
-                  f"**Example:** `{Config.PREFIX}removescammer @{member.name} {reports[0]['id']}`\n\n"
-                  f"Or use `{Config.PREFIX}clearallscam @{member.name}` to remove ALL reports",
+            value=f"`{Config.PREFIX}removescammer {user_input} <Report_ID>`\n\n"
+                  f"**Example:** `{Config.PREFIX}removescammer {user_input} {reports[0]['id']}`\n\n"
+                  f"Or use `{Config.PREFIX}clearallscam {user_input}` to remove ALL reports",
             inline=False
         )
         
         await ctx.send(embed=embed)
         return
     
-    # Check if report_id exists for this user
+    # Check if report exists
     report_exists = any(r['id'] == report_id for r in reports)
     
     if not report_exists:
         embed = discord.Embed(
             title="❌ Invalid Report ID",
-            description=f"Report ID `{report_id}` not found for {member.mention}",
+            description=f"Report ID `{report_id}` not found for **{user_name}**",
             color=discord.Color.red()
         )
         embed.add_field(
@@ -1422,31 +1512,66 @@ async def removescammer_cmd(ctx, member: discord.Member, report_id: int = None):
     
     embed = discord.Embed(
         title="✅ Scammer Report Removed",
-        description=f"Report ID `{report_id}` has been removed for {member.mention}",
+        description=f"Report ID `{report_id}` has been removed for **{user_name}**",
         color=discord.Color.green()
     )
     
     embed.add_field(name="Remaining Reports", value=f"{remaining_reports} 🚩", inline=True)
     embed.add_field(name="Removed By", value=ctx.author.mention, inline=True)
     
-    embed.set_thumbnail(url=member.display_avatar.url)
-    embed.set_footer(text=f"Removed by {ctx.author.name}")
+    if member and hasattr(member, 'display_avatar'):
+        embed.set_thumbnail(url=member.display_avatar.url)
     
+    embed.set_footer(text=f"Removed by {ctx.author.name}")
     await ctx.send(embed=embed)
     
-    logging.info(f"Staff {ctx.author.name} removed scammer report {report_id} for {member.name}")
+    logging.info(f"Staff {ctx.author.name} removed scammer report {report_id} for {user_name}")
+
+# ========================================
+# PART 4: Replace !clearallscam command (line ~1420)
+# ========================================
 
 @bot.command(name='clearallscam', aliases=['clearscammer'])
 @is_staff()
-async def clearallscam_cmd(ctx, member: discord.Member):
-    """Clear ALL scammer reports for a user (STAFF ONLY)"""
+async def clearallscam_cmd(ctx, *, user_input: str):
+    """Clear ALL scammer reports for a user - Works with @mention, username, or ID (STAFF ONLY)"""
     
-    reports = db.get_scammer_reports(member.id)
+    # Try to convert to member/user
+    member = None
+    user_id = None
+    user_name = user_input
+    
+    try:
+        clean_id = user_input.strip('<@!>')
+        user_id = int(clean_id)
+        
+        member = ctx.guild.get_member(user_id)
+        if not member:
+            try:
+                member = await bot.fetch_user(user_id)
+                user_name = member.name
+            except:
+                user_name = f"User ID: {user_id}"
+    
+    except ValueError:
+        try:
+            member = await commands.MemberConverter().convert(ctx, user_input)
+            user_id = member.id
+            user_name = member.name
+        except:
+            user_name = user_input
+            user_id = hash(user_input.lower()) % (10**15)
+    
+    if not user_id:
+        await ctx.send("❌ Invalid user input.")
+        return
+    
+    reports = db.get_scammer_reports(user_id)
     
     if not reports:
         embed = discord.Embed(
             title="❌ No Reports Found",
-            description=f"{member.mention} has no scammer reports to clear.",
+            description=f"**{user_name}** has no scammer reports to clear.",
             color=discord.Color.red()
         )
         await ctx.send(embed=embed)
@@ -1457,7 +1582,7 @@ async def clearallscam_cmd(ctx, member: discord.Member):
     # Confirmation
     confirm_embed = discord.Embed(
         title="⚠️ Confirm Clear All Reports",
-        description=f"Are you sure you want to remove ALL scammer reports for {member.mention}?",
+        description=f"Are you sure you want to remove ALL scammer reports for **{user_name}**?",
         color=discord.Color.orange()
     )
     confirm_embed.add_field(name="Reports to Clear", value=f"{report_count} 🚩", inline=True)
@@ -1478,20 +1603,21 @@ async def clearallscam_cmd(ctx, member: discord.Member):
         reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
         
         if str(reaction.emoji) == "✅":
-            db.clear_all_scammer_reports(member.id)
+            db.clear_all_scammer_reports(user_id)
             
             success_embed = discord.Embed(
                 title="✅ All Reports Cleared",
-                description=f"All {report_count} scammer reports cleared for {member.mention}",
+                description=f"All {report_count} scammer reports cleared for **{user_name}**",
                 color=discord.Color.green()
             )
-            success_embed.set_thumbnail(url=member.display_avatar.url)
+            if member and hasattr(member, 'display_avatar'):
+                success_embed.set_thumbnail(url=member.display_avatar.url)
             success_embed.set_footer(text=f"Cleared by {ctx.author.name}")
             
             await msg.edit(embed=success_embed)
             await msg.clear_reactions()
             
-            logging.info(f"Staff {ctx.author.name} cleared all scammer reports for {member.name}")
+            logging.info(f"Staff {ctx.author.name} cleared all scammer reports for {user_name}")
         else:
             cancel_embed = discord.Embed(
                 title="❌ Action Cancelled",
@@ -1797,7 +1923,7 @@ async def help_cmd(ctx):
         name="🌟 Reputation Commands",
         value=(
             f"`{Config.PREFIX}vouch @user reason` - Give {Config.VOUCH_REP_AMOUNT} rep\n"
-            f"`{Config.PREFIX}scam @user` - Check scammer reports\n"
+            f"`{Config.PREFIX}scamcheck @user` - Check scammer reports\n"
             f"`{Config.PREFIX}listscammers` - View all reported scammers\n"
             f"`{Config.PREFIX}helpvouch @user` - Staff - Give 2 rep per use | Members - Give 1 rep per use\n"
             f"`{Config.PREFIX}dummy @user` - Remove 1 rep (3x/day)\n"
