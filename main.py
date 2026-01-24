@@ -568,11 +568,13 @@ async def on_ready():
     print(f'Database: PostgreSQL ✅')
     print('=' * 70)
     
-    try:
-        synced = await bot.tree.sync()
-        print(f'Synced {len(synced)} slash commands')
-    except Exception as e:
-        logging.error(f'Sync failed: {e}')
+    # ONLY sync commands once, not every restart!
+    # After first sync, comment this out or remove it
+    # try:
+    #     synced = await bot.tree.sync()
+    #     print(f'Synced {len(synced)} slash commands')
+    # except Exception as e:
+    #     logging.error(f'Sync failed: {e}')
     
     await bot.change_presence(
         activity=discord.Activity(
@@ -584,8 +586,8 @@ async def on_ready():
     
     print('All systems active!')
     print('=' * 70)
-
-# ========================================
+    
+# =============================
 # LEADERBOARD VIEW
 # ========================================
 
