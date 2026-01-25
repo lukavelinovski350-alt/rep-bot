@@ -13,8 +13,29 @@ import signal
 import psycopg2
 from psycopg2.extras import Json
 import json
+import discord
+from discord.ext import commands, tasks
+from discord.ext.commands import CommandOnCooldown
+
+# Rate limit protection
+discord.http.HTTPClient.request = lambda self, *args, **kwargs: asyncio.sleep(0.5) or discord.http.HTTPClient.request(self, *args, **kwargs)
 
 load_dotenv()
+
+client = discord.Client(intents=discord.Intents.default())
+
+@client.event
+async def on_ready():
+    print(f'✅ Connected! Rate limit is GONE!')
+    await client.close()
+
+try:
+    client.run(os.getenv('DISCORD_BOT_TOKEN'))
+except discord.errors.HTTPException as e:
+    if e.status == 429:
+        print('❌ Still rate limited - wait longer!')
+    else:
+        print(f'Error: {e}')
 
 logging.basicConfig(
     level=logging.INFO,
@@ -559,6 +580,7 @@ def format_time(seconds: float) -> str:
         return f"{minutes}m {secs}s"
     return f"{secs}s"
 
+# Add this near the top after bot initialization
 @bot.event
 async def on_ready():
     print('=' * 70)
@@ -568,21 +590,19 @@ async def on_ready():
     print(f'Database: PostgreSQL ✅')
     print('=' * 70)
     
-    # ONLY sync commands once, not every restart!
-    # After first sync, comment this out or remove it
-    # try:
-    #     synced = await bot.tree.sync()
-    #     print(f'Synced {len(synced)} slash commands')
-    # except Exception as e:
-    #     logging.error(f'Sync failed: {e}')
+    try:
+        synced = await bot.tree.sync()
+        print(f'Synced {len(synced)} slash commands')
+    except discord.errors.HTTPException as e:
+        if e.status == 429:
+            logging.warning('⚠️ Rate limited during sync, skipping...')
+        else:
+            logging.error(f'Sync failed: {e}')
+    except Exception as e:
+        logging.error(f'Sync failed: {e}')
     
-    await bot.change_presence(
-        activity=discord.Activity(
-            type=discord.ActivityType.watching,
-            name=f"{Config.PREFIX}help | PostgreSQL"
-        ),
-        status=discord.Status.online
-    )
+    # Removed the presence update to reduce API calls
+    # await bot.change_presence(...)  # Comment this out temporarily
     
     print('All systems active!')
     print('=' * 70)
@@ -2094,17 +2114,37 @@ async def start_keep_alive():
 # ========================================
 
 async def main():
-    """Main startup"""
+    """Main startup with retry logic"""
     await start_keep_alive()
     
-    try:
-        await bot.start(Config.TOKEN)
-    except KeyboardInterrupt:
-        logging.info('Shutdown requested')
-        await bot.close()
-    except Exception as e:
-        logging.error(f'Bot error: {e}')
-        await bot.close()
+    retry_count = 0
+    max_retries = 3
+    
+    while retry_count < max_retries:
+        try:
+            logging.info(f'Attempting to connect... (Attempt {retry_count + 1}/{max_retries})')
+            await bot.start(Config.TOKEN)
+            break
+        except discord.errors.HTTPException as e:
+            if e.status == 429:
+                retry_count += 1
+                wait_time = 300  # Wait 5 minutes
+                logging.error(f'🚫 Rate limited by Discord! Waiting {wait_time}s before retry...')
+                if retry_count < max_retries:
+                    await asyncio.sleep(wait_time)
+                else:
+                    logging.error('Still rate limited. Please wait longer and try again.')
+                    break
+            else:
+                logging.error(f'HTTP error: {e}')
+                break
+        except KeyboardInterrupt:
+            logging.info('Shutdown requested')
+            await bot.close()
+            break
+        except Exception as e:
+            logging.error(f'Bot error: {e}')
+            break.
 
 if __name__ == '__main__':
     print('=' * 70)
