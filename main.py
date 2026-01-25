@@ -2144,7 +2144,7 @@ async def main():
             break
         except Exception as e:
             logging.error(f'Bot error: {e}')
-            break.
+            break
 
 if __name__ == '__main__':
     print('=' * 70)
