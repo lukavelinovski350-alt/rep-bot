@@ -17,25 +17,7 @@ import discord
 from discord.ext import commands, tasks
 from discord.ext.commands import CommandOnCooldown
 
-# Rate limit protection
-discord.http.HTTPClient.request = lambda self, *args, **kwargs: asyncio.sleep(0.5) or discord.http.HTTPClient.request(self, *args, **kwargs)
-
 load_dotenv()
-
-client = discord.Client(intents=discord.Intents.default())
-
-@client.event
-async def on_ready():
-    print(f'✅ Connected! Rate limit is GONE!')
-    await client.close()
-
-try:
-    client.run(os.getenv('DISCORD_BOT_TOKEN'))
-except discord.errors.HTTPException as e:
-    if e.status == 429:
-        print('❌ Still rate limited - wait longer!')
-    else:
-        print(f'Error: {e}')
 
 logging.basicConfig(
     level=logging.INFO,
